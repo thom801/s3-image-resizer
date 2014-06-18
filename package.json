@@ -1,0 +1,28 @@
+{
+  "name": "s3-bucket-resize",
+  "version": "0.0.0",
+  "description": "Batch image resizer for AWS S3 buckets",
+  "main": "index.js",
+  "dependencies": {
+    "awssum": "^1.2.0",
+    "awssum-amazon": "^1.4.0",
+    "awssum-amazon-s3": "^1.5.0",
+    "fmt": "^0.5.0",
+    "underscore": "^1.6.0",
+    "gm": "^1.16.0",
+    "async": "^0.9.0",
+    "request": "^2.36.0",
+    "colors": "^0.6.2"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "node",
+    "s3",
+    "image",
+    "resize",
+    "bucket",
+    "objects"
+  ],
+  "author": "Thom Allen - thom801.github.io",
+  "license": "ISC"
+}
