@@ -23,6 +23,9 @@
     "bucket",
     "objects"
   ],
+  "scripts": {
+    "start": "node index.js"
+  },
   "author": "Thom Allen - thom801.github.io",
   "license": "ISC"
 }

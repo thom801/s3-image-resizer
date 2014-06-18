@@ -16,8 +16,7 @@ var s3 = new amazonS3.S3({
 });
 
 var options = {
-  BucketName: config.s3.bucket,
-  MaxKeys: 10
+  BucketName: config.s3.bucket
 };
 
 function getObjects (callback) {
@@ -84,6 +83,6 @@ function processImages (images, callback) {
 }
 
 async.waterfall([getObjects, processImages], function (err, result) {
-   console.log('\nResizing complete.');
+   console.log('\nResizing complete.\n\n');
 });
 
