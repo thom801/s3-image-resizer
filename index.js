@@ -16,7 +16,9 @@ var s3 = new amazonS3.S3({
 });
 
 var options = {
-  BucketName: config.s3.bucket
+  BucketName: config.s3.bucket,
+  MaxKeys: config.resize.maxKeys || 1000,
+  Delimiter: '/'
 };
 
 function getObjects (callback) {
@@ -29,7 +31,14 @@ function getObjects (callback) {
 	  var results = data.Body.ListBucketResult;
 	  var isTruncated = results.Contents.length >= 1000;
 
-	  images = _.union(images, results.Contents);
+	  // Add objects to queue that are NOT folders.
+	  _.each(results.Contents, function (object) {
+	  	console.log(object.Key);
+	  	if (object.Key.indexOf('/') == -1 ) {
+
+	  		images.push(object);
+	  	}
+	  });
 
 	  var lastKey = images[images.length - 1].Key;
 
@@ -42,7 +51,8 @@ function getObjects (callback) {
 	});
 }
 
- function download (uri, filename, callback) {
+function download (uri, filename, callback) {
+	console.log(uri);
   request.head(uri, function(err, res, body){
     // console.log('content-type:', res.headers['content-type']);
     // console.log('content-length:', res.headers['content-length']);
@@ -50,36 +60,73 @@ function getObjects (callback) {
   });
 };
 
-function processImage (image, callback) {
+function processImage (image, done) {
 
 	var imageURL = 'http://'+ config.s3.bucket +'.s3.amazonaws.com/' + image.Key;
 	var tempPath = config.resize.tempPath + image.Key;
 	var resizedPath = config.resize.destPath + image.Key;
 
-	download(imageURL, tempPath, function(){
-		
-		gm(tempPath)
-		  .resize(config.resize.width, config.resize.height)
-		  .gravity(config.resize.gravity)
-		  .extent(config.resize.extent[0], config.resize.extent[1])
-		  .write(resizedPath, function(err) {
-				if(err) {
-					process.stdout.write('.'.red);
-					callback(err);
-				}
-				else {
-					process.stdout.write('.'.green);
-					callback();
-				}
-			}
-		);
+	async.waterfall([
+    
+    // Download the image from s3
+    function(callback){
+      download(imageURL, tempPath, callback);
+    },
 
-	});
+    // Resize the image and save it locally
+    function(callback){
+      gm(tempPath)
+        .resize(config.resize.width, config.resize.height)
+        .gravity(config.resize.gravity)
+        .extent(config.resize.extent[0], config.resize.extent[1])
+        .write(resizedPath, function(err) {
+      		if(err) {
+      			console.log(err);
+      			callback(err);
+      		}
+      		else {
+      			callback(null);
+      		}
+      	});
+    },
+
+    // Upload the image to s3, overwriting the original.
+    function(callback, err){
+    	if (err) {
+    		process.stdout.write('.'.red);
+    		console.log(err);
+    		return done(err);
+    	}
+
+    	fs.stat(resizedPath, function(err, file_info) {
+        var bodyStream = fs.createReadStream( resizedPath );
+        var filename = config.s3.destFolder + '/' + image.Key;
+        var options = {
+          BucketName    : config.s3.bucket,
+          ObjectName    : filename,
+          ContentLength : file_info.size,
+          Body          : bodyStream,
+          ContentType   : 'image/png'
+        };
+
+        // Upload to s3
+        s3.PutObject(options, function(err, data) {
+          if (err) {
+          	process.stdout.write('.'.red);
+          	return done(err);
+          }
+          process.stdout.write('.'.green);
+          done();
+        });
+    	});
+    }
+
+	], done);
 }
 
 function processImages (images, callback) {
 	console.log('Resizing '+ images.length +' images...');
-	async.eachLimit(images, 20, processImage, callback);
+	async.eachLimit(images, 10, processImage, callback);
 }
 
 async.waterfall([getObjects, processImages], function (err, result) {
